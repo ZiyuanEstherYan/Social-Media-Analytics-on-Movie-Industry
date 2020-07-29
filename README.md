@@ -1,10 +1,10 @@
 # Social Media Analytics on Movie Industry
 
-# Automated Bank Complaints Monitoring
-
 ## Summary of Project
-The purpose of this project is to rank bank complaints so that the cases that need monetary compensation can be dealt with first. Exploratory analysis was first performed to determine what factors to include in the predictive model. Three deep learning models were trained to compare the result and the best model was used for the binary prediction. Cases were sorted in descending order of the predicted probabilities. 
+Business Problem: "How can a client use their customer’s social media interaction data to influence their social media strategy?"
+The purpose of this project is to give insights about the customer's industry (movie industry), predict box office, as well as give suggestions about actionable strategy to increase social media performance/increase box office. 
+The datasets came from three primary social media sources, Facebook, Instagram and Twitter. A dataset with general information about each movie and media channel information was also provided. In addition, a dataset with information about movie attributes was scraped by the team from various sites containing movie attributes (IMDB, The-Numbers.com). 
 
-### Language: R
+### Language: R, Python
 
 #### *See detailed report in the PDF file.
