@@ -1,0 +1,461 @@
+---
+title: "Exploratory Analysis"
+author: "jb"
+date: "4/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(lubridate)
+library(radiant)
+library(readr)
+```
+
+```{r load, message = FALSE, warning = FALSE}
+rollup_1k_insta <- read_tsv('data/view_brand_rollup_instagram_1k-10k.tsv', guess_max = 100000)
+rollup_1k_fb <- read_tsv('data/view_brand_rollup_facebook_1k-10k.tsv', guess_max = 100000)
+rollup_1k_twit <- read_tsv('data/view_brand_rollup_twitter_1k-10k.tsv', guess_max = 100000)
+
+rollup_10k_insta <- read_tsv('data/view_brand_rollup_instagram_10kplus.tsv', guess_max = 100000)
+rollup_10k_fb <- read_tsv('data/view_brand_rollup_facebook_10kplus.tsv', guess_max = 100000)
+rollup_10k_twit <- read_tsv('data/view_brand_rollup_twitter_10kplus.tsv', guess_max = 100000)
+
+brand_1k <- read_tsv('data/brand_source_affiliations_1k-10k.tsv')
+
+
+comments_1k <- read_tsv('data/comments_1k-10k.tsv', col_names = FALSE)
+colnames(comments_1k) <- c('comment_id',	'comment_dcs_uid',	'comment_author_id',	'post_dcs_uid',	'post_author_dcs_uid',	'comment_lfm_type',	'comment_posted_at',	'comment_message', 'comment_sentiment_polarity',	'comment_primary_emotion',	'comment_ace_metadata',	'topics',	'comment_is_quote',	'spec_channel')
+
+#movies <- read_csv('data_concat/brands_with_extras.csv')
+brands_with_extras <- read_csv("data_concat/brands_with_extras.csv")
+movies <- brands_with_extras
+colnames(movies)[2] <- 'brand_ods_id'
+```
+
+
+```{r}
+
+```
+
+Concerns:
+Uncertain if movies are randomly sampled out of database. Even if we split the dataset to budget quantiles, might not be representative.  
+
+## Creating Filters and Transforming Data
+```{r}
+movies <- movies %>%
+  mutate(budget_quant = factor(xtile(budget, 5, T))) 
+
+#days_after_release category
+rollup_fb <- rollup_1k_fb %>%
+  rbind(rollup_10k_fb) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+rollup_insta <- rollup_1k_insta %>%
+  rbind(rollup_10k_insta) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+rollup_twit <- rollup_1k_twit %>%
+  rbind(rollup_10k_twit) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+```
+
+
+============================================= General =================================================
+
+## 1. General Trends
+__Facebook__
+```{r}  
+# Likes
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_likes = mean(likes, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_likes)) +
+  geom_vline(aes(xintercept = 0), color = '#FFAB40') +
+  theme_minimal()
+
+
+# Engagement
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_engagement = mean(engagement_rate, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_engagement)) +
+  theme_minimal()
+
+
+# Interactions
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions)) +
+  theme_minimal() +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+```
+
+__Instagram__
+```{r}
+# Likes
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_likes = mean(total_likes, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_likes))
+
+# Comments
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_comments = mean(total_comments, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_comments))
+
+# Interactions
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_comments = mean(total_comments, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_comments))
+
+```
+
+
+__Twitter__
+```{r}
+# Retweets
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_retweets = mean(total_retweets, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_retweets))
+
+# Favorites
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_favorites = mean(total_favorites, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_favorites))
+
+# Replies
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_replies = mean(total_replies, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_replies))
+
+# Interactions
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions))
+
+```
+
+
+=========================================== Drilldown =================================================
+
+## 1. Budget
+__Facebook__
+```{r warning = FALSE}  
+# Likes
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_likes = mean(likes, na.rm = T)) %>%
+  ggplot () +
+  geom_point(aes(days_after_release, mean_likes, color = budget_quant)) +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+
+# Engagement
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_engagement = mean(engagement_rate, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_engagement, color = budget_quant)) + 
+  facet_wrap(~budget_quant) +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+
+# Interactions
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions, color = budget_quant)) +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+```
+
+
+__Instagram__
+```{r warning = FALSE}
+# Likes
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_likes = mean(total_likes, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_likes, color = budget_quant)) +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+# Comments
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_comments = mean(total_comments, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_comments, color = budget_quant)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+# Interactions
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions, color = budget_quant)) +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+```
+
+__Twitter__
+```{r warning = FALSE}
+# Retweets
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_retweets = mean(total_retweets, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_retweets, color = budget_quant)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue')
+ 
+
+# Favorites
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_favorites = mean(total_favorites, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_favorites, color = budget_quant)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+
+# Replies
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_replies = mean(total_replies, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_replies, color = budget_quant)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+
+# Interactions
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365) & !is.na(budget)) %>%
+  group_by(days_after_release, budget_quant) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions, color = budget_quant)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+```
+
+
+
+## 2. Genre
+__Facebook__
+```{r warning = FALSE}  
+# Likes
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_likes = mean(likes, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_likes, color = top_genre)) +
+  geom_vline(aes(xintercept = 0), color = 'blue') + 
+  facet_wrap(~top_genre)
+
+
+# Engagement
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_engagement = mean(engagement_rate, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_engagement, color = top_genre)) + 
+  facet_wrap(~top_genre) +
+  geom_vline(aes(xintercept = 0), color = 'blue')
+
+
+# Interactions
+rollup_fb %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions, color = top_genre)) +
+  geom_vline(aes(xintercept = 0), color = 'blue') +
+  facet_wrap(~top_genre)
+```
+
+
+__Instagram__
+```{r warning = FALSE}
+# Likes
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_likes = mean(total_likes, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_likes, color = top_genre)) +
+  geom_vline(aes(xintercept = 0), color = 'blue') +
+  facet_wrap(~top_genre)
+
+# Comments
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_comments = mean(total_comments, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_comments, color = top_genre)) +
+  geom_vline(aes(xintercept = 0), color = 'blue') +
+  facet_wrap(~top_genre)
+
+
+# Interactions
+rollup_insta %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions, color = top_genre)) +
+  geom_vline(aes(xintercept = 0), color = 'blue') +
+  facet_wrap(~top_genre)
+
+```
+
+
+__Twitter__
+```{r warning = FALSE}
+# Retweets
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_retweets = mean(total_retweets, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_retweets, color = top_genre)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue') + 
+  facet_wrap(~top_genre)
+ 
+
+# Favorites
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_favorites = mean(total_favorites, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_favorites, color = top_genre)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue') + 
+  facet_wrap(~top_genre)
+
+
+# Replies
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_replies = mean(total_replies, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_replies, color = top_genre)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue') + 
+  facet_wrap(~top_genre)
+
+
+# Interactions
+rollup_twit %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  group_by(days_after_release, top_genre) %>%
+  summarize(mean_interactions = mean(total_post_interactions, na.rm = T)) %>%
+  ggplot() +
+  geom_point(aes(days_after_release, mean_interactions, color = top_genre)) + 
+  geom_vline(aes(xintercept = 0), color = 'blue') + 
+  facet_wrap(~top_genre)
+
+
+```
+
+
+========================================= Random Movies ===============================================
+## Drill Down
+### a. By Budget
+__Facebook__
+```{r}
+## Likes
+rollup_fb %>%
+  filter(!is.na(budget)) %>%
+  group_by(movie_id) %>%
+  mutate(max_likes = max(likes, na.rm = T)) %>%
+  ungroup() %>%
+  group_by(budget_quant) %>%
+  summarize(
+      mean_likes = mean(max_likes),
+      sd_likes = sd(max_likes)
+  )
+
+# x <- rollup_fb %>%
+#   filter(!is.na(budget)) %>%
+#   group_by(movie_id) %>%
+#   mutate(max_likes = max(likes, na.rm = T)) %>%
+#   group_by(movie_id) %>%
+#   summarize(likes = mean(max_likes),
+#             budget = mean(budget))
+
+rollup_fb %>%
+  filter(!is.na(budget)) %>%
+  group_by(movie_id) %>%
+  mutate(max_likes = max(likes, na.rm = T)) %>%
+  group_by(movie_id) %>%
+  summarize(likes = mean(max_likes),
+            budget = mean(budget)) %>%
+  ggplot() +
+  geom_point(aes(budget, likes))
+  
+
+## Engagement
+rollup_fb %>%
+  filter(!is.na(budget)) %>%
+  group_by(movie_id) %>%
+  mutate(max_engagement = max(engagement_rate, na.rm = T)) %>%
+  ungroup() %>%
+  group_by(budget_quant) %>%
+  summarize(
+      mean_engagement = mean(max_engagement),
+      sd_engagement = sd(max_engagement)
+  )
+
+```
+
+
+

@@ -1,0 +1,100 @@
+---
+title: "aspect_viz"
+author: "jb"
+date: "5/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+df <- read_csv('data/results.csv')
+dat <- read_csv('data/df.csv')
+```
+
+```{r}
+df %>%
+  group_by(aspect) %>%
+  count()
+
+```
+
+```{r}
+df %>%
+  filter(aspect == 'MOVIE#CHARACTERS') %>%
+  select('comment_message')
+
+df %>%
+  filter(aspect == 'MOVIE#GENERAL') %>%
+  select('comment_message')
+
+df %>%
+  filter(aspect == 'SOCIAL#HASHTAGS') %>%
+  select('comment_message')
+
+df %>%
+  filter(aspect == 'OTHERS') %>%
+  select('comment_message')
+
+df %>%
+  filter(aspect == 'SOCIAL#MENTIONS') %>%
+  select('comment_message')
+
+```
+
+
+```{r fig.width=15}
+x <- dat %>%
+  select(profit,43:54) 
+
+colnames(x) <- c('profit', '1month', '2months', '3months', '4months', 
+                 '5months', '6months', '7months', '8months', '9months',
+                 '10months', '11months', '12months')
+
+
+filter_names <- colnames(select(x, 2:ncol(x)))
+
+x <- x %>%
+  gather(key = 'days_before_release', value = 'total_post_interactions', -profit) 
+
+x %>%
+  ggplot() +
+  geom_point(aes(profit, total_post_interactions)) + 
+  facet_wrap(~days_before_release) 
+```
+
+```{r}
+corr_calc <- function(df, filter) {
+  x_filter <- df %>%
+    filter(days_before_release == filter)
+  
+  cor(x_filter$profit, x_filter$total_post_interactions)
+  
+}
+
+
+```
+
+```{r}
+corr_table <- tibble(
+  'months_before_release' = 0,
+  'corr' = 0
+)
+
+for(filter in filter_names) {
+  corr <- corr_calc(x, filter)
+  
+  corr <- tibble(
+  'months_before_release' = filter,
+  'corr' = corr)
+  
+  corr_table = rbind(corr_table, corr)
+}
+
+corr_table <- slice(corr_table, 2:nrow(corr_table))
+```
+
+```{r}
+knitr::kable(corr_table)
+
+```

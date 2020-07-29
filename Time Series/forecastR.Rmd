@@ -1,0 +1,244 @@
+---
+title: "time_series"
+author: "jb"
+date: "5/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(urca)
+library(fpp)
+library(tidyverse)
+library(radiant)
+library(dynlm)
+```
+
+## Methodology
+
+__Method 1__
+Objective: Create a predictive model for one movie given similar movie.
+
+1. Filter for top 20 similar movies for one movie
+
+2. Hold out is movie of choice. Train is 20 other most similar movies.
+
+3. Use a dynamic regressive model to predict
+
+4. Calculate RMSE 
+
+### Load Data
+```{r}
+rollup_1k_insta <- read_tsv('data/view_brand_rollup_instagram_1k-10k.tsv', guess_max = 100000)
+rollup_1k_fb <- read_tsv('data/view_brand_rollup_facebook_1k-10k.tsv', guess_max = 100000)
+rollup_1k_twit <- read_tsv('data/view_brand_rollup_twitter_1k-10k.tsv', guess_max = 100000)
+
+rollup_10k_insta <- read_tsv('data/view_brand_rollup_instagram_10kplus.tsv', guess_max = 100000)
+rollup_10k_fb <- read_tsv('data/view_brand_rollup_facebook_10kplus.tsv', guess_max = 100000)
+rollup_10k_twit <- read_tsv('data/view_brand_rollup_twitter_10kplus.tsv', guess_max = 100000)
+
+brand_1k <- read_tsv('data/brand_source_affiliations_1k-10k.tsv')
+
+
+movies <- read_csv('data_concat/brands_with_extras.csv')
+colnames(movies)[2] <- 'brand_ods_id'
+
+movies <- movies %>%
+  mutate(budget_quant = factor(xtile(budget, 5, T))) 
+
+#days_after_release category
+rollup_fb <- rollup_1k_fb %>%
+  rbind(rollup_10k_fb) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+rollup_insta <- rollup_1k_insta %>%
+  rbind(rollup_10k_insta) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+rollup_twit <- rollup_1k_twit %>%
+  rbind(rollup_10k_twit) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+ts_fb <- rollup_fb %>%
+  filter(between(days_after_release, -365, 0)) %>%
+  mutate(avg_interactions_per_post = total_post_interactions/total_post,
+         days_after_release = days_after_release + 365)
+
+ts_insta <- rollup_insta %>%
+  filter(between(days_after_release, -365, 0)) %>%
+  mutate(days_after_release = days_after_release + 365)
+
+ts_twit <- rollup_fb %>%
+  filter(between(days_after_release, -365, 0)) %>%
+  mutate(avg_interactions_per_post = total_post_interactions/total_post,
+         days_after_release = days_after_release + 365)
+```
+
+
+## Method 1
+### 1. Filter and split
+1. Filter for top 20 similar movies for one movie
+
+2. Hold out is movie of choice. Train is 10 other most similar movies.
+```{r}
+jac <- read_csv('data_concat/jac_sim_all_genres.csv')
+
+top20 <- jac[, 1:2] %>%
+  arrange(desc(`Blade Runner 2049`)) %>%
+  slice(2:11) %>%
+  select(replace) %>%
+  unlist()
+
+### Facebook
+df_fb <- ts_fb %>%
+  filter(replace %in% top20) %>%
+  select(replace, movie_id, total_post_interactions, days_after_release) 
+
+selected_movie_fb <- ts_fb %>%
+  filter(replace == 'Blade Runner 2049')%>%
+  select(replace, movie_id, total_post_interactions, days_after_release)
+
+
+
+### Instagram
+df_insta <- ts_insta %>%
+  filter(replace %in% top20) %>%
+  select(replace, movie_id, total_post_interactions, days_after_release)
+
+selected_movie_insta <- ts_insta %>%
+  filter(replace == 'Blade Runner 2049')%>%
+  select(replace, movie_id, total_post_interactions, days_after_release)
+
+
+  
+### Twitter
+df_twit <- ts_twit %>%
+  filter(replace %in% top20) %>%
+  select(replace, movie_id, total_post_interactions, days_after_release) 
+
+selected_movie_twit <- ts_twit %>%
+  filter(replace == 'Blade Runner 2049')%>%
+  select(replace, movie_id, total_post_interactions, days_after_release)
+
+```
+
+### 2. Predicting
+3. Use a dynamic regressive model to predict
+
+__Facebook__
+Visualising data first
+```{r}
+df_fb %>%
+  ggplot(aes(days_after_release, total_post_interactions, color = replace)) +
+  geom_line()
+```
+
+
+```{r}
+top_names <- unique(df_fb$replace)
+
+auto_ts <- function(df, top_names, n, start, end) {
+  x <- df %>%
+    filter(replace == top_names[n])
+  
+  ts <- ts(x$total_post_interactions, start = x$days_after_release)
+  
+  ts <- window(ts, start = start, end = end)
+  
+  return(ts)
+}
+
+
+ts_select <- ts(selected_movie_fb$total_post_interactions, start = selected_movie_fb$days_after_release)
+
+data <- cbind(auto_ts(df_fb, top_names, 1), auto_ts(df_fb, top_names, 2), auto_ts(df_fb, top_names, 3))
+
+model <- dynlm(auto_ts(df_fb, top_names, 1) ~ 
+                 auto_ts(df_fb, top_names, 2) +
+                 auto_ts(df_fb, top_names, 3) +
+                 auto_ts(df_fb, top_names, 4) +
+                 auto_ts(df_fb, top_names, 5) +
+                 auto_ts(df_fb, top_names, 6) +
+                 auto_ts(df_fb, top_names, 7) + 
+                 auto_ts(df_fb, top_names, 8) +
+                 auto_ts(df_fb, top_names, 9) +
+                 auto_ts(df_fb, top_names, 10))
+
+pred <- predict(model, ts_select)
+
+accuracy(pred, ts_select)
+
+autoplot(ts_select, series = 'original') + 
+  autolayer(ts(pred), series = 'prediction')
+```
+
+
+Try different forecasting methods by subsetting data.
+__100 days before__
+```{r}
+test_100 <- window(ts_select, start = 266) 
+
+train_100 <- window(ts_select, end = 265)
+
+# Holt's Model
+fit1 <- holt(train_100, h= 100)
+
+autoplot(test_100, series = 'actual') +
+  autolayer(fit1, h = 100, PI = FALSE, series = 'prediction')
+
+# Arima
+fit2 <- auto.arima(train_100)
+
+autoplot(test_100, series = 'actual') +
+  autolayer(forecast(fit2, h = 100), PI = FALSE, series = 'prediction')
+
+
+accuracy(fit1, test_100)
+accuracy(forecast(fit2, h=100), test_100)
+```
+
+```{r}
+x <- df_fb %>%
+    group_by(days_after_release) %>%
+    summarize(avg_posts = mean(total_post_interactions))
+
+x <- ts(data = x$avg_posts, start = x$days_after_release)
+
+x_100 <- window(x, end = 265)
+
+fit3 <- auto.arima(x_100)
+
+accuracy(forecast(fit2, h=100), test_100)
+
+autoplot(test_100, series = 'actual') +
+  autolayer(forecast(fit3, h = 100), PI = FALSE, series = 'prediction')
+```
+
+
+## Dynamic Model
+```{r}
+model <- dynlm(auto_ts(df_fb, top_names, 1, 0, end = 265) ~ 
+                 auto_ts(df_fb, top_names, 2, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 3, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 4, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 5, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 6, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 7, 0, end = 265) + 
+                 auto_ts(df_fb, top_names, 8, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 9, 0, end = 265) +
+                 auto_ts(df_fb, top_names, 10, 0, end = 265))
+
+
+pred <- predict(model, train_100)
+
+accuracy(pred, test_100)
+
+autoplot(ts_select, series = 'original') + 
+  autolayer(ts(pred), series = 'prediction')
+```

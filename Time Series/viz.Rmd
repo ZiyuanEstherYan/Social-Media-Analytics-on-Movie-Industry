@@ -1,0 +1,142 @@
+---
+title: "viz"
+author: "jb"
+date: "5/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(radiant)
+```
+
+```{r load, message = FALSE, warning = FALSE}
+rollup_1k_insta <- read_tsv('../data/view_brand_rollup_instagram_1k-10k.tsv', guess_max = 100000)
+rollup_1k_fb <- read_tsv('../data/view_brand_rollup_facebook_1k-10k.tsv', guess_max = 100000)
+rollup_1k_twit <- read_tsv('../data/view_brand_rollup_twitter_1k-10k.tsv', guess_max = 100000)
+
+rollup_10k_insta <- read_tsv('../data/view_brand_rollup_instagram_10kplus.tsv', guess_max = 100000)
+rollup_10k_fb <- read_tsv('../data/view_brand_rollup_facebook_10kplus.tsv', guess_max = 100000)
+rollup_10k_twit <- read_tsv('../data/view_brand_rollup_twitter_10kplus.tsv', guess_max = 100000)
+
+brand_1k <- read_tsv('../data/brand_source_affiliations_1k-10k.tsv')
+
+
+#movies <- read_csv('data_concat/brands_with_extras.csv')
+brands_with_extras <- read_csv("../data_concat/brands_with_extras.csv")
+movies <- brands_with_extras
+colnames(movies)[2] <- 'brand_ods_id'
+
+clusters <- read_csv('cluster_interaction.csv')
+```
+
+```{r}
+movies <- movies %>%
+  mutate(budget_quant = factor(xtile(budget, 5, T))) 
+
+#days_after_release category
+rollup_fb <- rollup_1k_fb %>%
+  rbind(rollup_10k_fb) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+rollup_insta <- rollup_1k_insta %>%
+  rbind(rollup_10k_insta) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+rollup_twit <- rollup_1k_twit %>%
+  rbind(rollup_10k_twit) %>%
+  left_join(movies, by = c('movie_id' = 'brand_ods_id')) %>%
+  mutate(
+      days_after_release = data_for - released_on)
+
+```
+
+
+```{r}
+dat <- clusters %>%
+  filter(cluster_id_5 == 0) %>%
+  pull('replace')
+
+rollup_fb %>%
+  filter(replace %in% dat) %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  filter(days_after_release <= 90) %>%
+  ggplot() +
+  geom_line(aes(days_after_release, total_post_interactions, color = replace)) +
+  theme_minimal()  +
+  theme(legend.position="none")
+
+```
+
+
+
+```{r}
+dat <- clusters %>%
+  filter(cluster_id_5 == 1) %>%
+  pull('replace')
+
+rollup_fb %>%
+  filter(replace %in% dat) %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  ggplot() +
+  geom_line(aes(days_after_release, total_post_interactions, color = replace)) +
+  theme_minimal()  +
+  theme(legend.position="none")
+
+
+```
+
+```{r}
+dat <- clusters %>%
+  filter(cluster_id_5 == 2) %>%
+  pull('replace')
+
+rollup_fb %>%
+  filter(replace %in% dat) %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  ggplot() +
+  geom_line(aes(days_after_release, total_post_interactions, color = replace)) +
+  theme_minimal()  +
+  theme(legend.position="none")
+
+
+```
+
+```{r}
+dat <- clusters %>%
+  filter(cluster_id_5 == 3) %>%
+  pull('replace')
+
+rollup_fb %>%
+  filter(replace %in% dat) %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  ggplot() +
+  geom_line(aes(days_after_release, total_post_interactions, color = replace)) +
+  theme_minimal()  +
+  theme(legend.position="none")
+
+
+```
+
+```{r}
+dat <- clusters %>%
+  filter(cluster_id_5 == 4) %>%
+  pull('replace')
+
+rollup_fb %>%
+  filter(replace %in% dat) %>%
+  filter(between(days_after_release, -365, 365)) %>%
+  ggplot() +
+  geom_line(aes(days_after_release, total_post_interactions, color = replace)) +
+  theme_minimal()  +
+  theme(legend.position="none")
+
+
+```
+

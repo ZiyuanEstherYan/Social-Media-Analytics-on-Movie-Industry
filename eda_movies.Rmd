@@ -1,0 +1,84 @@
+---
+title: "eda_movies"
+author: "jb"
+date: "4/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(splitstackshape)
+library(extrafont)
+
+
+movies <- read_csv('data_concat/movies.csv') 
+colnames(movies)[2] <- 'brand_ods_id'
+
+colnames(movies) <- colnames(movies) %>%
+  str_remove_all("^genres_")
+```
+
+
+
+```{r}
+# Year
+movies %>%
+  ggplot() +
+  geom_histogram(aes(released_year),  fill =  'steelblue') +
+  labs(title = 'Movies by Release Year') + 
+  theme_minimal() 
+
+# Genre
+movies %>%
+  select(23:ncol(movies)) %>%
+  gather('genre', 'count') %>%
+  group_by(genre) %>%
+  summarize(n = sum(count)) %>%
+  mutate(genre = as.factor(genre)) %>%
+  ggplot(aes(fct_reorder(genre, n), n)) + 
+  geom_col(aes(fill = n)) + 
+  coord_flip() +
+  theme_minimal() + 
+  labs(title = 'Movies by Genre')
+
+# Rating
+movies %>% 
+  ggplot() +
+  geom_bar(aes(rating, fill = rating)) +
+  theme_minimal() +
+  labs(title = 'Movies by Rating') +
+  scale_fill_viridis_d()
+
+# Budget
+movies %>%
+  ggplot() +
+  geom_histogram(aes(budget), fill =  'steelblue') +
+  theme_minimal() +
+  labs(title = 'Movies by Budget')
+
+# Production Company 
+# movies %>%
+#  ggplot() +
+#  geom_bar(aes(production_company)) +
+#  coord_flip()
+
+# Source
+movies %>%
+  ggplot() +
+  geom_bar(aes(source, fill = source)) +
+  theme_minimal() +
+  labs(title = 'Movies by Source') +
+  scale_fill_viridis_d()
+
+
+# Franchise
+movies %>%
+  mutate(franchise = as.factor(franchise)) %>%
+  ggplot() +
+  geom_bar(aes(franchise, fill = franchise)) +
+  theme_minimal() +
+  labs(title = 'Movies by Franchise') + 
+  scale_fill_viridis_d()
+```
+
